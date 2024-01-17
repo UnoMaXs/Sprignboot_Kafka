@@ -3,15 +3,20 @@ package com.aiken.spb_k_api.Service;
 import com.aiken.spb_k_api.Entity.Producto;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface IProductoService {
 
     List<Producto> getAllProductos();
 
-    Producto getProductoById(Long id);
+    Producto getProductoById(Long Productoid);
 
     void saveProducto(Producto producto);
 
-    void deleteProducto(Long id);
+    void deleteProducto(Long Productoid);
+
+    void aumentarCantidad(Long Productoid,int cantidad);
+
+    void disminuirCantidad(Long Productoid,int cantidad);
+
+    int getCantidad(Long productoId);
 }
