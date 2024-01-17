@@ -5,6 +5,7 @@ import com.aiken.spb_k_api.Service.IProductoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -15,23 +16,29 @@ import java.util.List;
 @RequestMapping("/api/v1/productos")
 public class ProductoController {
 
-
-    @Autowired
     private IProductoService productoService;
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     @Autowired
-    public ProductoController(IProductoService iProductoService) {
+    public ProductoController(KafkaTemplate<String, String> kafkaTemplate,IProductoService iProductoService) {
         this.productoService = iProductoService;
+        this.kafkaTemplate = kafkaTemplate;
+
     }
 
     @GetMapping
     public ResponseEntity<List> getAllProductos() {
         try {
             List<Producto> productos = productoService.getAllProductos();
+            if (productos.isEmpty()) {
+                kafkaTemplate.send("inventoryTopic", "No products found");
+            } else {
+                kafkaTemplate.send("inventoryTopic", "Showing all the products");
+            }
             return ResponseEntity.ok(productos);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Collections.singletonList("No products found"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonList("Error retrieving products"));
         }
     }
 
@@ -39,10 +46,18 @@ public class ProductoController {
     public ResponseEntity<Object> getProductosById(@PathVariable Long productoId) {
         try {
             Producto producto = productoService.getProductoById(productoId);
-            return ResponseEntity.ok(producto);
-        }catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found with id " + productoId);
+            if (producto != null) {
+                kafkaTemplate.send("inventoryTopic", "Product found: " + producto);
+                return ResponseEntity.ok(producto);
+            } else {
+                kafkaTemplate.send("inventoryTopic", "Product not found with id " + productoId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Product not found with id " + productoId);
+            }
+        } catch (Exception e) {
+            kafkaTemplate.send("inventoryTopic", "Error retrieving product with id " + productoId);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error retrieving product with id " + productoId);
         }
     }
 
@@ -50,19 +65,29 @@ public class ProductoController {
     public ResponseEntity<String> createProducto(@RequestBody Producto producto) {
         try {
             productoService.saveProducto(producto);
+            String productInfo = "Product ID: " + producto.getId() + ", Product Name: " + producto.getNombre();
+            kafkaTemplate.send("inventoryTopic", "Product created successfully: " + productInfo);
             return ResponseEntity.ok("Product created successfully");
         } catch (Exception e) {
-         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                 .body("Error creating Product");
+            kafkaTemplate.send("inventoryTopic", "Error creating product: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating Product");
         }
     }
 
     @PutMapping("/{productoId}")
     public ResponseEntity<String> updateProducto(@PathVariable Long productoId, @RequestBody Producto producto){
         try {
+            if (!productoService.existsProductoById(productoId)){
+                kafkaTemplate.send("inventoryTopic", "Product update failed: Product with ID " + productoId + " not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Error updating product: Product with ID " + productoId + " not found");
+            }
             productoService.saveProducto(producto);
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " Was updated successfully"));
             return ResponseEntity.ok("Product updated successfully");
         } catch (Exception e) {
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " Wasn't updated successfully"));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Error updating product");
         }
@@ -72,9 +97,16 @@ public class ProductoController {
     @DeleteMapping("/{productoId}")
     public ResponseEntity<String> deleteProducto(@PathVariable Long productoId){
         try {
+            if(!productoService.existsProductoById(productoId)){
+                kafkaTemplate.send("inventoryTopic", "Product deleting failed: Product with ID " + productoId + " not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Error updating product: Product with ID " + productoId + " not found");
+            }
             productoService.deleteProducto(productoId);
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " Was deleted"));
             return ResponseEntity.ok("Product deleted successfully");
         } catch (Exception e) {
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " Wasn't deleted successfully"));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Error deleting product");
         }
@@ -86,9 +118,17 @@ public class ProductoController {
             @RequestParam(name = "productoId") Long productoId,
             @RequestParam(name = "cantidad") int cantidad) {
         try {
+            if (!productoService.existsProductoById(productoId)) {
+                kafkaTemplate.send("inventoryTopic", "Product ID: " + productoId + " not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Error: Product not found with ID " + productoId);
+            }
             productoService.aumentarCantidad(productoId, cantidad);
-            return ResponseEntity.ok("The number of products have been updated to: " + productoService.getCantidad(productoId));
+            int nuevaCantidad = productoService.getCantidad(productoId);
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " - New quantity: " + nuevaCantidad));
+            return ResponseEntity.ok("The number of products have been updated to: " + nuevaCantidad);
         } catch (HttpClientErrorException.NotFound e) {
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " Wasn't found"));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Error: Product not found with ID " + productoId);
         } catch (Exception e) {
@@ -102,9 +142,17 @@ public class ProductoController {
             @RequestParam(name = "productoId") Long productoId,
             @RequestParam(name = "cantidad") int cantidad) {
         try{
+            if (!productoService.existsProductoById(productoId)) {
+                kafkaTemplate.send("inventoryTopic", "Product ID: " + productoId + " not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Error: Product not found with ID " + productoId);
+            }
             productoService.disminuirCantidad(productoId, cantidad);
-            return ResponseEntity.ok("The number of products have been updated to: " + productoService.getCantidad(productoId));
+            int nuevaCantidad = productoService.getCantidad(productoId);
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " - New quantity: " + nuevaCantidad));
+            return ResponseEntity.ok("The number of products have been updated to: " + nuevaCantidad);
         } catch (HttpClientErrorException.NotFound e) {
+            kafkaTemplate.send("inventoryTopic",("inventory modification: Product ID: "+ productoId + " Wasn't found"));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Error: Product not found with ID " + productoId);
         } catch (Exception e) {

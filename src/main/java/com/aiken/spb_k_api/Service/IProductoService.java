@@ -19,4 +19,7 @@ public interface IProductoService {
     void disminuirCantidad(Long Productoid,int cantidad);
 
     int getCantidad(Long productoId);
+
+    boolean existsProductoById(Long productoId);
+
 }

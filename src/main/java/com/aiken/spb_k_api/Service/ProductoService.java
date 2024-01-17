@@ -3,7 +3,6 @@ package com.aiken.spb_k_api.Service;
 import com.aiken.spb_k_api.Entity.Producto;
 import com.aiken.spb_k_api.Repository.ProductoRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.hibernate.annotations.NotFound;
 import org.hibernate.service.spi.ServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -99,6 +98,12 @@ public class ProductoService implements IProductoService {
         } else {
             throw new EntityNotFoundException("Producto no encontrado con ID: " + productoId);
         }
+    }
+
+    @Override
+    public boolean existsProductoById(Long productoId) {
+        Optional<Producto> productoOptional = productoRepository.findById(productoId);
+        return productoOptional.isPresent();
     }
 
 
