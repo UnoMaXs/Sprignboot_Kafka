@@ -22,17 +22,21 @@ public class ProductoService implements IProductoService {
     public ProductoService(ProductoRepository productoRepository) {
         this.productoRepository = productoRepository;
     }
+
     @Override
     public List<Producto> getAllProductos() {
         List<Producto> productos = productoRepository.findAll();
-        if (productos == null) {
-            throw new ServiceException("Error al obtener todos los productos");
+        if (productos == null || productos.isEmpty()) {
+            throw new ServiceException("No hay productos disponibles.");
         }
         return productos;
     }
 
     @Override
     public Producto getProductoById(Long productoId) {
+        if (productoId == null || productoId <= 0) {
+            throw new IllegalArgumentException("El ID del producto debe ser un valor válido.");
+        }
         return productoRepository.findById(productoId)
                 .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con ID: " + productoId));
     }
@@ -47,7 +51,12 @@ public class ProductoService implements IProductoService {
     }
 
     @Override
+    @Transactional
     public void deleteProducto(Long productoId) {
+        if (productoId == null || productoId <= 0) {
+            throw new IllegalArgumentException("El ID del producto debe ser un valor válido.");
+        }
+
         try {
             productoRepository.deleteById(productoId);
         } catch (EmptyResultDataAccessException e) {
@@ -59,7 +68,12 @@ public class ProductoService implements IProductoService {
 
 
     @Override
-    public void aumentarCantidad(Long productoId,int cantidad) {
+    @Transactional
+    public void aumentarCantidad(Long productoId, int cantidad) {
+        if (productoId == null || productoId <= 0 || cantidad <= 0) {
+            throw new IllegalArgumentException("ID del producto y cantidad deben ser valores válidos.");
+        }
+
         Optional<Producto> optionalProducto = productoRepository.findById(productoId);
 
         if (optionalProducto.isPresent()) {
@@ -72,12 +86,18 @@ public class ProductoService implements IProductoService {
     }
 
     @Override
+    @Transactional
     public void disminuirCantidad(Long productoId, int cantidad) {
+        if (productoId == null || productoId <= 0 || cantidad <= 0) {
+            throw new IllegalArgumentException("ID del producto y cantidad deben ser valores válidos.");
+        }
+
         Optional<Producto> optionalProducto = productoRepository.findById(productoId);
 
         if (optionalProducto.isPresent()) {
             Producto producto = optionalProducto.get();
             int cantidadActual = producto.getCantidad();
+
             if (cantidadActual >= cantidad) {
                 producto.setCantidad(cantidadActual - cantidad);
                 productoRepository.save(producto);
@@ -91,6 +111,10 @@ public class ProductoService implements IProductoService {
 
     @Override
     public int getCantidad(Long productoId) {
+        if (productoId == null || productoId <= 0) {
+            throw new IllegalArgumentException("El ID del producto debe ser un valor válido.");
+        }
+
         Optional<Producto> productoOptional = productoRepository.findById(productoId);
         if (productoOptional.isPresent()) {
             Producto producto = productoOptional.get();
@@ -100,12 +124,14 @@ public class ProductoService implements IProductoService {
         }
     }
 
-    @Override
+        @Override
     public boolean existsProductoById(Long productoId) {
+        if (productoId == null || productoId <= 0) {
+            throw new IllegalArgumentException("El ID del producto debe ser un valor válido.");
+        }
+
         Optional<Producto> productoOptional = productoRepository.findById(productoId);
         return productoOptional.isPresent();
     }
-
-
 
 }
