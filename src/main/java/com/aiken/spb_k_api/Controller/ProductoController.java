@@ -30,6 +30,11 @@ public class ProductoController {
     public ResponseEntity<List> getAllProductos() {
         try {
             List<Producto> productos = productoService.getAllProductos();
+            if (productos.isEmpty()) {
+                kafkaTemplate.send("inventoryTopic", "No products found");
+            } else {
+                kafkaTemplate.send("inventoryTopic", "Showing all the products");
+            }
             return ResponseEntity.ok(productos);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

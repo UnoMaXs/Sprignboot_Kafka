@@ -25,11 +25,9 @@ public class ProductoService implements IProductoService {
     @Override
     public List<Producto> getAllProductos() {
         List<Producto> productos = productoRepository.findAll();
-                    if (productos.isEmpty()) {
-                kafkaTemplate.send("inventoryTopic", "No products found");
-            } else {
-                kafkaTemplate.send("inventoryTopic", "Showing all the products");
-            }
+        if (productos == null) {
+            throw new ServiceException("Error al obtener todos los productos");
+        }
         return productos;
     }
 
