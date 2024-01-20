@@ -64,9 +64,9 @@ public class ProductoController {
                     .body("Error creating Product");
         }
     }
-@PutMapping("/{productoId}")
-public ResponseEntity<String> updateProducto(@PathVariable Long productoId, @RequestBody Producto producto){
-    try {
+    @PutMapping("/{productoId}")
+    public ResponseEntity<String> updateProducto(@PathVariable Long productoId, @RequestBody Producto producto){
+        try {
         productoService.saveProducto(producto);
         kafkaTemplate.send("inventoryTopic", "inventory modification: Product ID: " + productoId + " Was updated successfully");
         return ResponseEntity.ok("Product updated successfully");
@@ -78,25 +78,25 @@ public ResponseEntity<String> updateProducto(@PathVariable Long productoId, @Req
         kafkaTemplate.send("inventoryTopic", "inventory modification: Product ID: " + productoId + " Wasn't updated successfully");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Error updating product");
+        }
     }
-}
 
-@DeleteMapping("/{productoId}")
-public ResponseEntity<String> deleteProducto(@PathVariable Long productoId){
-    try {
-        productoService.deleteProducto(productoId);
-        kafkaTemplate.send("inventoryTopic", "inventory modification: Product ID: " + productoId + " Was deleted");
-        return ResponseEntity.ok("Product deleted successfully");
-    } catch (EntityNotFoundException e) {
-        kafkaTemplate.send("inventoryTopic", "Product deleting failed: Product with ID " + productoId + " not found");
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body("Error deleting product: Product with ID " + productoId + " not found");
-    } catch (Exception e) {
-        kafkaTemplate.send("inventoryTopic", "inventory modification: Product ID: " + productoId + " Wasn't deleted successfully");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Error deleting product");
+    @DeleteMapping("/{productoId}")
+    public ResponseEntity<String> deleteProducto(@PathVariable Long productoId){
+        try {
+            productoService.deleteProducto(productoId);
+            kafkaTemplate.send("inventoryTopic", "inventory modification: Product ID: " + productoId + " Was deleted");
+            return ResponseEntity.ok("Product deleted successfully");
+        } catch (EntityNotFoundException e) {
+            kafkaTemplate.send("inventoryTopic", "Product deleting failed: Product with ID " + productoId + " not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Error deleting product: Product with ID " + productoId + " not found");
+        } catch (Exception e) {
+            kafkaTemplate.send("inventoryTopic", "inventory modification: Product ID: " + productoId + " Wasn't deleted successfully");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error deleting product");
+        }
     }
-}
 
 
     @PutMapping("/aumentar")
